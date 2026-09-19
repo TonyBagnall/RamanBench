@@ -134,12 +134,15 @@ def _run_one(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-dir", type=Path, required=True)
-    parser.add_argument("--results-dir", type=Path, required=True)
-    parser.add_argument("--tsml-eval", type=Path, default=None,
+    parser.add_argument("--data-dir", type=Path,
+                        default=Path.home() / "Data/RamanBench/classification")
+    parser.add_argument("--results-dir", type=Path,
+                        default=Path.home() / "Results/RamanBench")
+    parser.add_argument("--tsml-eval", type=Path,
+                        default=Path.home() / "Code/tsml-eval",
                         help="tsml-eval checkout to add to PYTHONPATH")
     parser.add_argument("--classifier", action="append", choices=CLASSIFIERS,
-                        default=None, help="repeat to select components; default: all")
+                        required=True, help="repeat to select multiple components")
     parser.add_argument("--problem", action="append", default=None,
                         help="select one or more problem directory names")
     parser.add_argument("--resamples", type=_parse_resamples, default=[0, 1, 2])
@@ -175,7 +178,7 @@ def main() -> int:
         problems = [problem for problem in problems if problem in set(args.problem)]
     if len(problems) != 21:
         LOG.warning("Found %d problems; expected 21", len(problems))
-    classifiers = args.classifier or list(CLASSIFIERS)
+    classifiers = args.classifier
     results = []
     for classifier in classifiers:
         for problem in problems:

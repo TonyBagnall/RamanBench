@@ -37,7 +37,7 @@ import numpy as np
 from aeon.datasets import load_from_ts_file
 
 LOG = logging.getLogger("run_hc2_components")
-CLASSIFIERS = ("Arsenal", "DrCIF", "TDE", "STC")
+CLASSIFIERS = ("Arsenal", "DrCIF", "TDE", "STC", "HC2", "MRHydra")
 
 
 def _parse_resamples(value: str) -> list[int]:
@@ -94,7 +94,7 @@ def _run_one(
     prediction_dir = results_dir / output_name / "Predictions" / problem
     train_result = prediction_dir / f"trainResample{resample}.csv"
     test_result = prediction_dir / f"testResample{resample}.csv"
-    if train_result.exists() and test_result.exists() and not overwrite:
+    if test_result.exists() and (not train_files or train_result.exists()) and not overwrite:
         return {"classifier": output_name, "problem": problem, "resample": resample, "status": "skip"}
 
     train_file, test_file = _problem_files(problem_dir, problem, resample)

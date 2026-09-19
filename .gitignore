@@ -208,6 +208,7 @@ __marimo__/
 
 # RamanBench — benchmark outputs (large, reproducible from source)
 results/
+.rd/
 .cache/
 AutogluonModels/
 
@@ -218,3 +219,4 @@ AutogluonModels/
 .DS_Store
 **/.DS_Store
 **/.cache_loader_check
+.fresh_loader_check/

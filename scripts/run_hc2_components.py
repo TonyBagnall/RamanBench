@@ -48,7 +48,9 @@ def _parse_resamples(value: str) -> list[int]:
 
 
 def _problem_files(directory: Path, problem: str, resample: int) -> tuple[Path, Path]:
-    stem = f"{problem}{resample:02d}"
+    # Problem directories already include the target suffix, e.g. ``alzheimer_0``.
+    # RamanBench files append the resample index directly: ``alzheimer_00``.
+    stem = f"{problem}{resample}"
     train = directory / f"{stem}_TRAIN.ts"
     test = directory / f"{stem}_TEST.ts"
     if not train.is_file() or not test.is_file():
@@ -176,7 +178,7 @@ def main() -> int:
         if unknown:
             parser.error(f"problem directories not found: {unknown}")
         problems = [problem for problem in problems if problem in set(args.problem)]
-    if len(problems) != 21:
+    if not args.problem and len(problems) != 21:
         LOG.warning("Found %d problems; expected 21", len(problems))
     classifiers = args.classifier
     results = []

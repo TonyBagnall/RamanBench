@@ -14,6 +14,9 @@ partition="${SLURM_PARTITION:-compute}"
 qos="${SLURM_QOS:-uea-core-default}"
 memory_mb="${MEMORY_MB:-32000}"
 time_limit="${TIME_LIMIT:-7-00:00:00}"
+module_name="${HALI_MODULE:-python/anaconda/2024.10/3.12.7}"
+conda_sh="${CONDA_SH:-/gpfs/software/hali/python/anaconda/2024.10/etc/profile.d/conda.sh}"
+env_name="${CONDA_ENV:-tsml-eval}"
 
 if [[ ! -d "$data_dir" ]]; then
     echo "Data directory not found: $data_dir" >&2
@@ -53,6 +56,9 @@ for classifier in Arsenal DrCIF TDE STC; do
         --wrap="
 set -euo pipefail
 export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1
+module add "$module_name"
+source "$conda_sh"
+conda activate "$env_name"
 problem=\$(sed -n \"\${SLURM_ARRAY_TASK_ID}p\" \"$dataset_list\")
 python -u \"$repo_dir/scripts/run_hc2_components.py\" \\
   --data-dir \"$data_dir\" \\

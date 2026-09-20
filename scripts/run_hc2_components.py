@@ -74,7 +74,7 @@ def _make_classifier(name: str, seed: int, n_jobs: int, fit_contract: int,
         n_jobs=n_jobs,
         fit_contract=fit_contract,
     )
-    # Not all aeon components expose verbosity (currently HC2 and STC do).
+    # Enable native progress output, allowing for older aeon versions and MRHydra.
     if "verbose" in estimator.get_params(deep=False):
         estimator.set_params(verbose=verbose)
     return requested, estimator

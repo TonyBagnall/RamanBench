@@ -21,6 +21,7 @@ Example on HALI::
 
 ``DrCIF`` means ``DrCIF-500`` by default, matching the HC2 component settings.
 Use ``--drcif-estimators 200`` for the standard aeon DrCIF default instead.
+Estimator verbosity is enabled where supported; use ``--no-verbose`` to disable it.
 """
 
 from __future__ import annotations
@@ -63,16 +64,20 @@ def _classifier_name(name: str, drcif_estimators: int) -> str:
 
 
 def _make_classifier(name: str, seed: int, n_jobs: int, fit_contract: int,
-                     drcif_estimators: int):
+                     drcif_estimators: int, verbose: bool = True):
     from tsml_eval.experiments import get_classifier_by_name
 
     requested = _classifier_name(name, drcif_estimators)
-    return requested, get_classifier_by_name(
+    estimator = get_classifier_by_name(
         requested,
         random_state=seed,
         n_jobs=n_jobs,
         fit_contract=fit_contract,
     )
+    # Not all aeon components expose verbosity (currently HC2 and STC do).
+    if "verbose" in estimator.get_params(deep=False):
+        estimator.set_params(verbose=verbose)
+    return requested, estimator
 
 
 def _run_one(
@@ -87,6 +92,7 @@ def _run_one(
     train_files: bool,
     overwrite: bool,
     benchmark_time: bool,
+    verbose: bool = True,
 ) -> dict:
     from tsml_eval.experiments.experiments import run_classification_experiment
 
@@ -95,9 +101,11 @@ def _run_one(
     train_result = prediction_dir / f"trainResample{resample}.csv"
     test_result = prediction_dir / f"testResample{resample}.csv"
     if test_result.exists() and (not train_files or train_result.exists()) and not overwrite:
+        LOG.info("Skipping existing results: %s %s resample %d", output_name, problem, resample)
         return {"classifier": output_name, "problem": problem, "resample": resample, "status": "skip"}
 
     train_file, test_file = _problem_files(problem_dir, problem, resample)
+    LOG.info("Loading %s and %s", train_file, test_file)
     X_train, y_train = load_from_ts_file(str(train_file))
     X_test, y_test = load_from_ts_file(str(test_file))
     if X_train.ndim != 3 or X_test.ndim != 3:
@@ -106,8 +114,11 @@ def _run_one(
         raise ValueError(f"Non-finite values in {problem} resample {resample}")
 
     output_name, estimator = _make_classifier(
-        classifier, resample, n_jobs, fit_contract, drcif_estimators
+        classifier, resample, n_jobs, fit_contract, drcif_estimators, verbose
     )
+    LOG.info("Starting %s: train=%s, test=%s, classes=%d, train_results=%s, verbose=%s",
+             output_name, X_train.shape, X_test.shape, len(np.unique(y_train)),
+             train_files, estimator.get_params(deep=False).get("verbose", "unsupported"))
     started = time.perf_counter()
     run_classification_experiment(
         X_train,
@@ -123,12 +134,15 @@ def _run_one(
         build_train_file=train_files,
         benchmark_time=benchmark_time,
     )
+    elapsed = round(time.perf_counter() - started, 3)
+    LOG.info("Completed %s %s resample %d in %.3fs; test results: %s",
+             output_name, problem, resample, elapsed, test_result)
     return {
         "classifier": output_name,
         "problem": problem,
         "resample": resample,
         "status": "pass",
-        "seconds": round(time.perf_counter() - started, 3),
+        "seconds": elapsed,
         "train_file": str(train_file),
         "test_file": str(test_file),
     }
@@ -155,6 +169,8 @@ def main() -> int:
     parser.add_argument("--train-files", action=argparse.BooleanOptionalAction, default=True,
                         help="write tsml trainResample files; enabled by default")
     parser.add_argument("--benchmark-time", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, default=True,
+                        help="enable estimator progress output where supported (default: on)")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--summary", type=Path, default=None)
     args = parser.parse_args()
@@ -192,6 +208,7 @@ def main() -> int:
                         problem_dir, problem, resample, classifier, results_dir,
                         args.n_jobs, args.fit_contract, args.drcif_estimators,
                         args.train_files, args.overwrite, args.benchmark_time,
+                        args.verbose,
                     ))
                 except Exception as exc:  # keep the batch moving across datasets
                     LOG.exception("Failed %s %s resample %d", classifier, problem, resample)

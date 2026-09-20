@@ -38,6 +38,7 @@ if [[ "$count" -ne 21 ]]; then
     exit 1
 fi
 
+for resample in 0 1 2; do
 sbatch \
     --account="$account" \
     --partition="$partition" \
@@ -46,7 +47,7 @@ sbatch \
     --mem="${memory_mb}M" \
     --cpus-per-task=1 \
     --array="1-${count}" \
-    --job-name="RamanBench-MRHydra" \
+    --job-name="RamanBench-MRHydra-r${resample}" \
     --output="$results_dir/slurm_logs/%x-%A_%a.out" \
     --error="$results_dir/slurm_logs/%x-%A_%a.err" \
     --wrap="
@@ -62,9 +63,10 @@ python -u \"$repo_dir/scripts/run_hc2_components.py\" \\
   --tsml-eval \"$tsml_eval_dir\" \\
   --classifier MRHydra \\
   --problem \"\$problem\" \\
-  --resamples 0,1,2 \\
+  --resamples \"$resample\" \\
   --no-train-files \\
-  --summary \"$results_dir/summaries/MRHydra_\${SLURM_ARRAY_TASK_ID}.json\"
+  --summary \"$results_dir/summaries/MRHydra_\${problem}_resample${resample}.json\"
 "
 
-echo "Submitted MRHydra test-only array over $count problems."
+done
+echo "Submitted MRHydra: $((count * 3)) tasks, one problem/resample per task."

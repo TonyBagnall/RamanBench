@@ -39,6 +39,7 @@ if [[ "$count" -ne 21 ]]; then
 fi
 
 for classifier in HC2 MRHydra; do
+  for resample in 0 1 2; do
     sbatch \
         --account="$account" \
         --partition="$partition" \
@@ -47,7 +48,7 @@ for classifier in HC2 MRHydra; do
         --mem="${memory_mb}M" \
         --cpus-per-task=1 \
         --array="1-${count}" \
-        --job-name="RamanBench-${classifier}" \
+        --job-name="RamanBench-${classifier}-r${resample}" \
         --output="$results_dir/slurm_logs/%x-%A_%a.out" \
         --error="$results_dir/slurm_logs/%x-%A_%a.err" \
         --wrap="
@@ -63,10 +64,11 @@ python -u \"$repo_dir/scripts/run_hc2_components.py\" \\
   --tsml-eval \"$tsml_eval_dir\" \\
   --classifier \"$classifier\" \\
   --problem \"\$problem\" \\
-  --resamples 0,1,2 \\
+  --resamples \"$resample\" \\
   --no-train-files \\
-  --summary \"$results_dir/summaries/${classifier}_\${problem}.json\"
+  --summary \"$results_dir/summaries/${classifier}_\${problem}_resample${resample}.json\"
 "
+  done
 done
 
-echo "Submitted HC2 and MRHydra test-only arrays over $count problems."
+echo "Submitted HC2 and MRHydra: $((count * 3 * 2)) tasks, one classifier/problem/resample per task."

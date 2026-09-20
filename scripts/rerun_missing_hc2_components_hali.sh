@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Retry incomplete HC2 component results with 128 GB and verbose output.
+# Each classifier/problem/resample is an independent job.
 # Run with --dry-run to print the plan without submitting jobs.
 set -euo pipefail
 
@@ -53,12 +54,12 @@ for classifier in Arsenal DrCIF TDE STC; do
             fi
         done
         [[ ${#missing[@]} -gt 0 ]] || continue
-        resamples=$(IFS=,; echo "${missing[*]}")
-        job_name="RamanBench-retry-${classifier}-${problem}"
+      for resample in "${missing[@]}"; do
+        job_name="RamanBench-retry-${classifier}-${problem}-r${resample}"
         dependencies=()
         while IFS='|' read -r job_id active_name; do
-            if [[ "$active_name" == "$job_name" ]] ||
-               [[ "$active_name" == "RamanBench-${classifier}" && "$job_id" == *_$((index + 1)) ]]; then
+            if [[ "$active_name" == "$job_name" || "$active_name" == "RamanBench-retry-${classifier}-${problem}" ]] ||
+               [[ ( "$active_name" == "RamanBench-${classifier}" || "$active_name" == "RamanBench-${classifier}-r${resample}" ) && "$job_id" == *_$((index + 1)) ]]; then
                 dependencies+=("$job_id")
             fi
         done <<< "$active_jobs"
@@ -66,22 +67,23 @@ for classifier in Arsenal DrCIF TDE STC; do
         if [[ ${#dependencies[@]} -gt 0 ]]; then
             dependency_args+=("--dependency=afterany:$(IFS=:; echo "${dependencies[*]}")")
         fi
-        echo "$classifier $problem resamples=$resamples memory=128G ${dependency_args[*]}"
+        echo "$classifier $problem resample=$resample memory=128G ${dependency_args[*]}"
         jobs=$((jobs + 1))
-        runs=$((runs + ${#missing[@]}))
+        runs=$((runs + 1))
         $dry_run && continue
 
         # Quote each value for the job shell, including problem names with parentheses.
         printf -v command_line '%q ' python -u "$repo_dir/scripts/run_hc2_components.py" \
             --data-dir "$data_dir" --results-dir "$results_dir" --tsml-eval "$tsml_eval_dir" \
-            --classifier "$classifier" --problem "$problem" --resamples "$resamples" \
-            --train-files --verbose --summary "$results_dir/summaries/retry_${classifier}_${problem}.json"
+            --classifier "$classifier" --problem "$problem" --resamples "$resample" \
+            --train-files --verbose --summary "$results_dir/summaries/retry_${classifier}_${problem}_resample${resample}.json"
         printf -v setup 'module add %q\nsource %q\nconda activate %q\n' "$module_name" "$conda_sh" "$env_name"
         sbatch --account="${SLURM_ACCOUNT:-cmp}" --partition="${SLURM_PARTITION:-compute}" \
             --qos="${SLURM_QOS:-uea-core-default}" --time="${TIME_LIMIT:-7-00:00:00}" \
             --mem=128G --cpus-per-task=1 --job-name="$job_name" \
             --output="$results_dir/slurm_logs/%x-%j.out" --error="$results_dir/slurm_logs/%x-%j.err" \
             "${dependency_args[@]}" --wrap="$(printf 'set -euo pipefail\nexport OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1\n%s%s\n' "$setup" "$command_line")"
+      done
     done
 done
 echo "Jobs: $jobs; incomplete component/resample pairs: $runs; dry-run: $dry_run"

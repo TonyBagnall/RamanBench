@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Submit one HALI array per HC2 component. Each array element runs all three
-# RamanBench resamples for one classification problem and writes tsml-style
+# Submit one HALI array per HC2 component and resample. Each task runs one
+# problem/resample and writes tsml-style
 # trainResampleN.csv/testResampleN.csv files.
 set -euo pipefail
 
@@ -41,7 +41,8 @@ if [[ "$count" -ne 21 ]]; then
 fi
 
 for classifier in Arsenal DrCIF TDE STC; do
-    job_name="RamanBench-${classifier}"
+  for resample in 0 1 2; do
+    job_name="RamanBench-${classifier}-r${resample}"
     sbatch \
         --account="$account" \
         --partition="$partition" \
@@ -66,10 +67,11 @@ python -u \"$repo_dir/scripts/run_hc2_components.py\" \\
   --tsml-eval \"$tsml_eval_dir\" \\
   --classifier \"$classifier\" \\
   --problem \"\$problem\" \\
-  --resamples 0,1,2 \\
+  --resamples \"$resample\" \\
   --train-files \\
-  --summary \"$results_dir/summaries/${classifier}_\${problem}.json\"
+  --summary \"$results_dir/summaries/${classifier}_\${problem}_resample${resample}.json\"
 "
+  done
 done
 
-echo "Submitted four classifier arrays over $count problems."
+echo "Submitted HC2 components: $((count * 3 * 4)) tasks, one classifier/problem/resample per task."

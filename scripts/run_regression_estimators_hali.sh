@@ -16,6 +16,14 @@ module_name="${HALI_MODULE:-python/anaconda/2024.10/3.12.7}"
 conda_sh="${CONDA_SH:-/gpfs/software/hali/python/anaconda/2024.10/etc/profile.d/conda.sh}"
 env_name="${CONDA_ENV:-tsml-eval}"
 drcif_estimators="${DRCIF_ESTIMATORS:-200}"
+# Example: REGRESSORS=DrCIF DRCIF_ESTIMATORS=500 bash scripts/run_regression_estimators_hali.sh
+read -r -a regressors <<< "${REGRESSORS:-DrCIF QUANT}"
+for regressor in "${regressors[@]}"; do
+  case "$regressor" in
+    DrCIF|QUANT) ;;
+    *) echo "Unknown regressor: $regressor" >&2; exit 1 ;;
+  esac
+done
 
 [[ -d "$data_dir" ]] || { echo "Data directory not found: $data_dir" >&2; exit 1; }
 [[ -f "$repo_dir/scripts/run_regression_estimators.py" ]] || {
@@ -33,12 +41,14 @@ if [[ "$count" -eq 0 ]]; then
   exit 1
 fi
 
-for regressor in DrCIF QUANT; do
+for regressor in "${regressors[@]}"; do
+  output_name="$regressor"
+  [[ "$regressor" != DrCIF ]] || output_name="DrCIF-${drcif_estimators}"
   for resample in 0 1 2; do
     sbatch \
       --account="$account" --partition="$partition" --qos="$qos" \
       --time="$time_limit" --mem="${memory_mb}M" --cpus-per-task=1 \
-      --array="1-${count}" --job-name="RamanReg-${regressor}-r${resample}" \
+      --array="1-${count}" --job-name="RamanReg-${output_name}-r${resample}" \
       --output="$results_dir/slurm_logs/%x-%A_%a.out" \
       --error="$results_dir/slurm_logs/%x-%A_%a.err" \
       --wrap="
@@ -52,9 +62,9 @@ python -u '$repo_dir/scripts/run_regression_estimators.py' \\
   --data-dir '$data_dir' --results-dir '$results_dir' --tsml-eval '$tsml_eval_dir' \\
   --regressor '$regressor' --problem \"\$problem\" --resamples '$resample' \\
   --drcif-estimators '$drcif_estimators' --train-files \\
-  --summary '$results_dir/summaries/${regressor}_\${problem}_resample${resample}.json'
+  --summary \"$results_dir/summaries/${output_name}_\${problem}_resample${resample}.json\"
 "
   done
 done
 
-echo "Submitted regression arrays for $count target problems, both regressors, resamples 0-2."
+echo "Submitted ${regressors[*]} for $count target problems, resamples 0-2."

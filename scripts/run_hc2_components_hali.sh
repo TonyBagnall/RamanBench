@@ -17,6 +17,14 @@ time_limit="${TIME_LIMIT:-7-00:00:00}"
 module_name="${HALI_MODULE:-python/anaconda/2024.10/3.12.7}"
 conda_sh="${CONDA_SH:-/gpfs/software/hali/python/anaconda/2024.10/etc/profile.d/conda.sh}"
 env_name="${CONDA_ENV:-tsml-eval}"
+# Example: CLASSIFIERS=QUANT bash scripts/run_hc2_components_hali.sh
+read -r -a classifiers <<< "${CLASSIFIERS:-Arsenal DrCIF TDE STC}"
+for classifier in "${classifiers[@]}"; do
+    case "$classifier" in
+        Arsenal|DrCIF|TDE|STC|HC2|MRHydra|QUANT) ;;
+        *) echo "Unknown classifier: $classifier" >&2; exit 1 ;;
+    esac
+done
 
 if [[ ! -d "$data_dir" ]]; then
     echo "Data directory not found: $data_dir" >&2
@@ -40,7 +48,7 @@ if [[ "$count" -ne 21 ]]; then
     exit 1
 fi
 
-for classifier in Arsenal DrCIF TDE STC; do
+for classifier in "${classifiers[@]}"; do
   for resample in 0 1 2; do
     job_name="RamanBench-${classifier}-r${resample}"
     sbatch \
@@ -74,4 +82,4 @@ python -u \"$repo_dir/scripts/run_hc2_components.py\" \\
   done
 done
 
-echo "Submitted HC2 components: $((count * 3 * 4)) tasks, one classifier/problem/resample per task."
+echo "Submitted ${classifiers[*]}: $((count * 3 * ${#classifiers[@]})) tasks, one classifier/problem/resample per task."

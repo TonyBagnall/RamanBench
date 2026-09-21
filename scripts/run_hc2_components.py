@@ -38,7 +38,7 @@ import numpy as np
 from aeon.datasets import load_from_ts_file
 
 LOG = logging.getLogger("run_hc2_components")
-CLASSIFIERS = ("Arsenal", "DrCIF", "TDE", "STC", "HC2", "MRHydra")
+CLASSIFIERS = ("Arsenal", "DrCIF", "TDE", "STC", "HC2", "MRHydra", "QUANT")
 
 
 def _parse_resamples(value: str) -> list[int]:
